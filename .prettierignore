@@ -15,5 +15,6 @@
 .dockerignore
 bun.lock
 .worktrees/
+.claude/worktrees/
 
 .husky/_
