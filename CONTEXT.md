@@ -26,10 +26,11 @@ The variant-named, mutable tag that always points to the most recent build
 of that variant.
 _Avoid_: latest tag
 
-**Dated tag**:
-An immutable snapshot of one build of a variant, suffixed with the build
-date (e.g. `claude-code-docker-20260922`). What consumers pin to.
-_Avoid_: version tag, release tag
+**Version tag**:
+The immutable tag of one published build of a variant, suffixed with the
+semver from `package.json` at build time (e.g. `claude-code-docker-0.1.0`).
+What consumers pin to.
+_Avoid_: dated tag, release tag
 
 **Image contract**:
 What a sandbox template delivers by itself, with no boot-time script and no
