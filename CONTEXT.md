@@ -30,3 +30,26 @@ _Avoid_: latest tag
 An immutable snapshot of one build of a variant, suffixed with the build
 date (e.g. `claude-code-docker-20260922`). What consumers pin to.
 _Avoid_: version tag, release tag
+
+**Image contract**:
+What a sandbox template delivers by itself, with no boot-time script and no
+external stack. In this repository that is everything — all toolchains are
+baked at build time.
+_Avoid_: runtime contract, bootstrap contract
+
+**Baked toolchain**:
+A toolchain installed into the image at build time, as opposed to one
+provisioned on first boot.
+_Avoid_: preinstalled, runtime-installed
+
+**Tests stack**:
+The standalone throwaway Compose project (`tests/docker-compose.yml`) the
+test suite builds and probes — isolated from any live deployment by its own
+project name and image tag.
+_Avoid_: test environment, CI stack
+
+**Base inheritance**:
+The surface the final image inherits from its variant's Base image (the
+`agent` user, the `tini` entrypoint, the `claude` command, `BASH_ENV`) that
+later build stages must not regress.
+_Avoid_: base config, upstream contract

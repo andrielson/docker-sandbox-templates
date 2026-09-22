@@ -1,0 +1,19 @@
+# Tests stack: a standalone throwaway stack, isolated from any live one by
+# identity — its own project name, its own image tag and the one-off
+# container names the suite passes — so it runs beside a real deployment
+# without touching it; the tag is local-only and never collides with the
+# published ghcr.io/andrielson/sandbox-templates tags. The suite only ever
+# builds the image and runs one-off containers against it (there is no
+# long-running service to keep, and no boot-time provisioning to exercise),
+# so the file declares no ports, volumes or dependencies: build and
+# identity are its whole job. The build context is src, the tracked symlink
+# tests/src -> ../src, so the uploaded tree is exactly what a plain build
+# from src/ would send (ADR 0002).
+name: docker-sandbox-templates-tests
+
+services:
+  sandbox:
+    # Implicit Dockerfile: src/Dockerfile through the tests/src symlink.
+    build:
+      context: src
+    image: docker-sandbox-templates-tests:latest

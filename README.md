@@ -94,7 +94,8 @@ sbx run --template sandbox-templates:claude-code-docker claude
 - **ShellCheck** (0.10+) — shell linting (`lint:sh` and the pre-commit
   gate). Shell _formatting_ needs no host binary: it goes through Prettier
   and `prettier-plugin-sh`.
-- **Docker Desktop** — building and pushing the images.
+- **Docker Desktop** — building and pushing the images, and running the
+  test suite (a cold build is heavy).
 
 ### Build and publish
 
@@ -120,6 +121,7 @@ setup.
 | ---------------------- | -------------------------------------------------- |
 | `bun install`          | Install dependencies (and activate the git hooks)  |
 | `bun run lint`         | Biome check (TS family)                            |
+| `bun run lint:compose` | Validate the tests Compose file                    |
 | `bun run lint:fix`     | Biome check with auto-fix                          |
 | `bun run lint:sh`      | ShellCheck over the tracked shell scripts          |
 | `bun run format`       | Prettier write (markdown/YAML/shell/Dockerfile)    |
@@ -133,6 +135,24 @@ touch the same file: **Biome** owns the TS family (`ts`, `tsx`, `js`,
 Dockerfile. The `pre-commit` hook runs lint-staged fixers, ShellCheck on
 staged shell files and the full type check.
 
+### Tests
+
+`tests/docker.test.ts` verifies the Image contract of `src/Dockerfile`:
+everything the multi-stage build bakes — the pinned toolchains (Bun, Rust,
+Node, Nix), the Nix profile tools, the environment defaults, file ownership
+and the config inherited from the base image. The suite builds the image
+through the throwaway Tests stack (`tests/docker-compose.yml`, isolated by
+its own project name; the build context reaches `src/` through the
+`tests/src` symlink — see ADR 0002) and probes a standing one-off container.
+
+```bash
+bun test             # full suite: builds the image first (a cold build is heavy)
+bun run lint:compose # validate the tests Compose file
+```
+
+A cold build pulls base images and compiles the Nix profile — expect tens of
+minutes; later runs hit the local BuildKit cache.
+
 ### Agent tooling
 
 - **DeepWiki MCP** (`.mcp.json`) answers questions about public GitHub
@@ -145,6 +165,7 @@ staged shell files and the full type check.
 ### Project layout
 
 - `src/Dockerfile` — the `claude-code-docker` template
+- `tests/` — the image-contract test suite and its Tests stack
 - `CONTEXT.md` — the project glossary
 - `docs/adr/` — architecture decision records
 - `docs/agents/` — agent workflow docs

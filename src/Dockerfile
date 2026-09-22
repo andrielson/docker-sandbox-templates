@@ -158,7 +158,12 @@ COPY --link --from=scratch-rust /__SCRATCH__/ /__SCRATCH__/
 #uv
 COPY --link --from=scratch-uv /__SCRATCH__/ /__SCRATCH__/
 
-RUN chown --recursive agent:agent /__SCRATCH__/
+# The official Rust image ships /usr/local/cargo and /usr/local/rustup as
+# 0777 and uv leaves its tools lock group-writable; mv preserves those
+# modes, so the copied home must strip the group/other write bits again —
+# everything under /home/agent belongs to the agent alone.
+RUN chown --recursive agent:agent /__SCRATCH__/ \
+  && chmod --recursive go-w /__SCRATCH__/home/
 
 
 FROM scratch-root

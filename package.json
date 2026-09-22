@@ -4,6 +4,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "biome check .",
+    "lint:compose": "docker compose --file tests/docker-compose.yml config --quiet",
     "lint:fix": "biome check --write .",
     "lint:sh": "git ls-files '*.sh' | xargs --no-run-if-empty shellcheck",
     "prepare": "husky",

@@ -1,0 +1,3 @@
+# Tests build their Compose context through the tests/src symlink
+
+The Tests compose file lives under `tests/`, but builds the image from `src/`. Compose resolves a build context relative to the Compose file's own directory, so reaching the source tree needs a path that escapes `tests/` — an absolute path would break on every other clone. We ship the tracked symlink `tests/src -> ../src` as the build context instead: relative, portable, and the uploaded tree is exactly what a plain `docker build src` would send (the daemon follows the symlink client-side, during context upload). The alternative — `context: ..` with `dockerfile: src/Dockerfile` — would upload the whole repository as the build context and change which files `.dockerignore` governs.

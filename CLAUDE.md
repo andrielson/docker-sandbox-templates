@@ -27,6 +27,7 @@ below. The `.husky/*.ts` hooks count as TypeScript inputs, so
 - `bun run <file>` — run a script directly
 - `bun test` — run all tests; `bun test path/to/file.test.ts` for one file, `bun test -t "<name>"` for one test
 - `bun run lint` / `bun run lint:fix` — Biome check (TS family), with and without auto-fix
+- `bun run lint:compose` — validate the tests Compose file against the schema
 - `bun run lint:sh` — ShellCheck over the tracked shell scripts
 - `bun run format` / `bun run format:check` — Prettier write/check (markdown, YAML, shell, Dockerfile)
 - `bun run typecheck` — `tsc --noEmit`
