@@ -7,7 +7,7 @@ with a batteries-included development environment.
 Everything is published under a single image,
 `ghcr.io/andrielson/sandbox-templates`, with one tag per variant mirroring
 the upstream variant names — see
-[ADR-0001](docs/adr/0001-variant-tags-mirror-upstream.md). Terminology lives
+[ADR-0003](docs/adr/0003-semver-tags-from-package-json.md). Terminology lives
 in [`CONTEXT.md`](CONTEXT.md).
 
 ## Available templates
@@ -35,12 +35,12 @@ Built for both `linux/amd64` and `linux/arm64`.
 
 ## Tags
 
-Every build of a variant is published under two tags:
+Every published build of a variant carries two tags:
 
 - **Rolling tag** — the variant name (`claude-code-docker`): mutable, always
-  points at the latest build.
-- **Dated tag** — `claude-code-docker-20260922` (build date, UTC): immutable
-  snapshot. Pin this one in automation.
+  points at the latest published build.
+- **Version tag** — `claude-code-docker-0.1.0`: the semver from
+  `package.json` at build time, immutable. Pin this one in automation.
 
 ## Usage
 
@@ -99,13 +99,31 @@ sbx run --template sandbox-templates:claude-code-docker claude
 
 ### Build and publish
 
-```bash
-docker buildx build \
-  --platform linux/amd64,linux/arm64 \
-  --tag ghcr.io/andrielson/sandbox-templates:claude-code-docker \
-  --tag ghcr.io/andrielson/sandbox-templates:claude-code-docker-$(date --utc +%Y%m%d) \
-  --push src/
-```
+Publishing is a CI job, not a local command. Whenever a merge to `main`
+bumps the `version` field in `package.json`, CI builds both architectures
+on native runners, merges them into one manifest list and pushes the
+rolling and version tags to GHCR; the git tag `v<version>` and its GitHub
+Release are the publication record (ADR-0003). To release:
+
+1. Bump `version` in `package.json` (strict `X.Y.Z` semver).
+2. Merge to `main` — the Publish jobs take it from there.
+
+A `workflow_dispatch` run on `main` re-evaluates the same gates: a publish
+that failed midway self-heals (the git tag never landed), an already
+released version is skipped.
+
+### CI
+
+`.github/workflows/ci.yml` runs on pull requests, merges to `main` and
+manual dispatch:
+
+- **Hygiene** — Biome, Prettier, `tsc`, ShellCheck and the Compose schema.
+- **Test suite** — the image-contract tests, cache-warmed from the
+  published image; skips on draft PRs and documentation-only diffs.
+- **Publish** — releases the image as described above.
+
+The `main` ruleset requires Hygiene and Test suite on every pull request
+and blocks direct pushes, so nothing reaches `main` untested.
 
 ### Repository tooling
 

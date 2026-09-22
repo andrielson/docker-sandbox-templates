@@ -7,8 +7,9 @@ This file provides guidance to AGENTS when working with code in this repository.
 This repository builds and publishes custom templates for Docker Sandboxes:
 ready-to-run, batteries-included environments for coding agents, built on the
 official `docker/sandbox-templates` base images. The publishing layout — a
-single image with one rolling tag per variant plus immutable dated tags — is
-recorded in `docs/adr/0001-variant-tags-mirror-upstream.md`.
+single image with one rolling tag per variant plus semver version tags from
+`package.json` — is recorded in
+`docs/adr/0003-semver-tags-from-package-json.md` (superseding ADR-0001).
 
 The only variant today is `claude-code-docker` (`src/Dockerfile`): a
 kitchen-sink environment for the Claude Code agent — Node.js 26, Bun, Nix
@@ -31,7 +32,7 @@ below. The `.husky/*.ts` hooks count as TypeScript inputs, so
 - `bun run lint:sh` — ShellCheck over the tracked shell scripts
 - `bun run format` / `bun run format:check` — Prettier write/check (markdown, YAML, shell, Dockerfile)
 - `bun run typecheck` — `tsc --noEmit`
-- Build and publish the template image — see [Build and publish](README.md#build-and-publish) in the README for the exact multi-arch `docker buildx build` invocation (rolling + dated tags, `--push`)
+- Publish the template image — CI does it on merge to `main` whenever the `version` field in `package.json` bumps; see [Build and publish](README.md#build-and-publish) in the README
 
 ## Building images
 

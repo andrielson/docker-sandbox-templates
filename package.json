@@ -1,5 +1,6 @@
 {
   "name": "bun-devops-template",
+  "version": "0.1.0",
   "scripts": {
     "format": "prettier --write .",
     "format:check": "prettier --check .",

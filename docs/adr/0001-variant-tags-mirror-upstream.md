@@ -1,5 +1,11 @@
 # One image, one tag per variant, mirroring upstream
 
+> [!IMPORTANT]
+> Superseded by
+> [ADR-0003](0003-semver-tags-from-package-json.md): the immutable pin
+> target is now the semver version tag from `package.json`, not the dated
+> tag. The single image, one rolling tag per variant layout survives.
+
 All templates are published under a single image,
 `ghcr.io/andrielson/sandbox-templates`, with one tag per variant reusing the
 upstream `docker/sandbox-templates` variant names (`claude-code-docker`
