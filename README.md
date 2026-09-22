@@ -1,27 +1,112 @@
-# bun-devops-template
+# docker-sandbox-templates
 
-A GitHub template for Bun-based DevOps projects: the quality tooling, git
-hooks and agent tooling are prewired — bring your own code. There is no
-entry point (`index.ts` was intentionally removed); start from whatever the
-derived project needs.
+Custom templates for [Docker Sandboxes](https://docs.docker.com/ai/sandboxes/):
+OCI images that extend the official `docker/sandbox-templates` base images
+with a batteries-included development environment.
 
-Generated with `bun init` (Bun v1.4.2); the tooling set is distilled from
-[rtx-workspace](https://github.com/andrielson/rtx-workspace), the first
-project built on it.
+Everything is published under a single image,
+`ghcr.io/andrielson/sandbox-templates`, with one tag per variant mirroring
+the upstream variant names — see
+[ADR-0001](docs/adr/0001-variant-tags-mirror-upstream.md). Terminology lives
+in [`CONTEXT.md`](CONTEXT.md).
 
-## Prerequisites
+## Available templates
+
+| Rolling tag          | Base image                                    | Agent       |
+| -------------------- | --------------------------------------------- | ----------- |
+| `claude-code-docker` | `docker/sandbox-templates:claude-code-docker` | Claude Code |
+
+### `claude-code-docker`
+
+A kitchen-sink environment for the Claude Code agent, on top of the
+`claude-code-docker` base (Claude Code plus a full Docker Engine inside the
+sandbox):
+
+- **Node.js 26** (NodeSource) and **Bun 1.4.2** (with `bunx` and bash
+  completion)
+- **Nix 2.35.2** (single-user install, flakes enabled) with a profile
+  including Go, Java 25, Kotlin, Scala, Gradle, Maven, PHP + Composer,
+  Quarkus, `gh`, `git`, `glab`, `ripgrep`, `jq`, `yq`, `shellcheck` and more
+- **Rust 1.98.1** (rustup, stable toolchain)
+- **uv**, **ruff** and **ty** for Python (default Python 3.14)
+- `build-essential` and `bash-completion`
+
+Built for both `linux/amd64` and `linux/arm64`.
+
+## Tags
+
+Every build of a variant is published under two tags:
+
+- **Rolling tag** — the variant name (`claude-code-docker`): mutable, always
+  points at the latest build.
+- **Dated tag** — `claude-code-docker-20260922` (build date, UTC): immutable
+  snapshot. Pin this one in automation.
+
+## Usage
+
+### Prerequisites
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) with
+  Sandboxes enabled (the `sbx` CLI).
+
+### Authenticate the sandbox runtime to GHCR
+
+The sandbox daemon pulls templates straight from the registry — it does not
+reuse your local Docker login, and non-Docker-Hub registries require
+credentials even for public images:
+
+```bash
+gh auth token | sbx secret set --registry ghcr.io --password-stdin
+```
+
+### Run
+
+```bash
+sbx run --template ghcr.io/andrielson/sandbox-templates:claude-code-docker claude
+```
+
+Unlike Docker commands, `sbx` does not auto-resolve registry domains, so the
+`ghcr.io/` prefix is required.
+
+### Caveats
+
+- Agent configuration files (e.g. `/home/agent/.claude/settings.json`) are
+  recreated at sandbox creation and do not persist in the template.
+- Agent and tool versions are baked into the image and do not auto-update;
+  update them inside the sandbox or rebuild.
+- Sandboxes restrict network access by default; allow what you need, e.g.
+  `sbx policy allow network 'registry.npmjs.org:443'`.
+
+### Local alternative (no registry)
+
+```bash
+docker buildx build --platform linux/amd64 --tag sandbox-templates:claude-code-docker src/
+docker image save sandbox-templates:claude-code-docker --output sandbox-templates.tar
+sbx template load sandbox-templates.tar
+sbx run --template sandbox-templates:claude-code-docker claude
+```
+
+## Development
+
+### Prerequisites
 
 - **Bun** (1.4+) — runs the scripts, the test suite and the git hooks.
 - **ShellCheck** (0.10+) — shell linting (`lint:sh` and the pre-commit
   gate). Shell _formatting_ needs no host binary: it goes through Prettier
   and `prettier-plugin-sh`.
-- **Docker** — optional; only for derived projects that validate Compose
-  files or build images.
+- **Docker Desktop** — building and pushing the images.
 
-## Getting started
+### Build and publish
 
-Use this repository as a template on GitHub ("Use this template"), clone
-the result, then:
+```bash
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  --tag ghcr.io/andrielson/sandbox-templates:claude-code-docker \
+  --tag ghcr.io/andrielson/sandbox-templates:claude-code-docker-$(date --utc +%Y%m%d) \
+  --push src/
+```
+
+### Repository tooling
 
 ```bash
 bun install
@@ -31,83 +116,44 @@ bun install
 points `core.hooksPath` at `.husky/_`, so a fresh clone needs zero manual
 setup.
 
-## Commands
-
-| Command                | What it does                                                                           |
-| ---------------------- | -------------------------------------------------------------------------------------- |
-| `bun install`          | Install dependencies (and activate the git hooks)                                      |
-| `bun run lint`         | Biome check (TS family)                                                                |
-| `bun run lint:fix`     | Biome check with auto-fix                                                              |
-| `bun run lint:sh`      | ShellCheck over the tracked shell scripts                                              |
-| `bun run format`       | Prettier write (markdown/YAML/shell/Dockerfile)                                        |
-| `bun run format:check` | Prettier check, no changes applied                                                     |
-| `bun run typecheck`    | `tsc --noEmit`                                                                         |
-| `bun test`             | Run the test suite ([Bun's test runner](https://bun.com/docs/test-writer) is built in) |
-| `bun build <entry>`    | Bundle an entrypoint (`.ts`, `.html`, `.css`)                                          |
-
-## Lint, formatting and type checking
+| Command                | What it does                                       |
+| ---------------------- | -------------------------------------------------- |
+| `bun install`          | Install dependencies (and activate the git hooks)  |
+| `bun run lint`         | Biome check (TS family)                            |
+| `bun run lint:fix`     | Biome check with auto-fix                          |
+| `bun run lint:sh`      | ShellCheck over the tracked shell scripts          |
+| `bun run format`       | Prettier write (markdown/YAML/shell/Dockerfile)    |
+| `bun run format:check` | Prettier check, no changes applied                 |
+| `bun run typecheck`    | `tsc --noEmit`                                     |
+| `bun test`             | Run the test suite (Bun's test runner is built in) |
 
 Formatting is split between two tools with strict ownership — they never
-touch the same file:
+touch the same file: **Biome** owns the TS family (`ts`, `tsx`, `js`,
+`jsx`, `json`, `jsonc`); **Prettier** owns markdown, YAML, shell and
+Dockerfile. The `pre-commit` hook runs lint-staged fixers, ShellCheck on
+staged shell files and the full type check.
 
-- **Biome** owns the TS family (`ts`, `tsx`, `js`, `jsx`, `json`, `jsonc`):
-  lint, formatting and import organization, configured in `biome.json`.
-- **Prettier** owns markdown, YAML, shell and Dockerfile, configured in
-  `.prettierrc` with `prettier-plugin-sh` (which embeds shfmt's engine for
-  shell). `.prettierignore` excludes the Biome-owned extensions so a
-  repo-wide Prettier run never crosses the boundary.
+### Agent tooling
 
-`.shellcheckrc` holds the ShellCheck policy (bash dialect, optional rules
-enabled, known-noise codes disabled). `lint:sh` targets every tracked
-shell script (`git ls-files`), so it respects `.gitignore` and stays a
-no-op until the project adds scripts.
-
-## Git hooks (Husky)
-
-Hooks run through [Husky](https://typicode.github.io/husky/) and activate
-themselves (see [Getting started](#getting-started)). Hook logic is
-TypeScript executed by Bun; each extensionless hook under `.husky/` is a
-minimal shell shim delegating to its sibling `.ts` implementation — the
-same files `lint` and `typecheck` cover.
-
-- `pre-commit` — lint-staged runs the fixers on staged files and re-stages
-  what changed (Biome on the TS family, Prettier on its own types,
-  configured in `.lintstagedrc.json`); then the blocking gates: ShellCheck
-  on staged shell files, and the full type check.
-- `post-checkout` / `post-merge` — rerun `bun install` so `node_modules`
-  never goes stale after a checkout, merge or pull.
-
-Escape hatches for emergencies: `git commit --no-verify` skips the hook
-once, and `HUSKY=0` disables Husky entirely (e.g. `HUSKY=0 bun install`
-skips hook activation).
-
-VS Code is preconfigured (`.vscode/`, `.editorconfig`) to format on save
-with the same tools as the hooks: Biome for the TS family, the Prettier
-extension for markdown, YAML, shell and Dockerfile.
-
-## Agent tooling
-
-The template ships coding-agent tooling alongside the code:
-
-- **DeepWiki MCP** — `.mcp.json` declares the `deepwiki` MCP server
-  (`https://mcp.deepwiki.com/mcp`), a free, no-authentication service that
-  answers questions about public GitHub repositories from AI-generated
-  documentation. The `deepwiki` skill in `.claude/skills/` describes when
-  and how to use it.
-- **Agent workflows** — `docs/agents/` holds the workflows for coding
-  agents (issue tracker via `gh`, triage labels, domain docs); start at
+- **DeepWiki MCP** (`.mcp.json`) answers questions about public GitHub
+  repositories; the `deepwiki` skill in `.claude/skills/` describes when and
+  how to use it.
+- **Agent workflows** — `docs/agents/` holds the workflows for coding agents
+  (issue tracker via `gh`, triage labels, domain docs); start at
   `CLAUDE.md`.
-- **mattpocock-skills plugin** — `.claude/settings.json` enables the
-  `mattpocock-skills` Claude Code plugin, which provides the engineering
-  skills those workflow docs refer to.
+
+### Project layout
+
+- `src/Dockerfile` — the `claude-code-docker` template
+- `CONTEXT.md` — the project glossary
+- `docs/adr/` — architecture decision records
+- `docs/agents/` — agent workflow docs
 
 ## Conventions
 
 - All repository content is written in English.
 - Commands use long options wherever the tool provides them.
-- Compose files use the long syntax for volumes and ports.
-- Formatting is split with strict ownership (see
-  [Lint, formatting and type checking](#lint-formatting-and-type-checking)).
+- Tool versions in Dockerfiles are pinned via `ARG`s.
 
-The full list, including Bun-over-Node preferences and shell quoting rules,
-lives in `CLAUDE.md`.
+See `CLAUDE.md` for the full list, including Bun-over-Node preferences and
+shell quoting rules.

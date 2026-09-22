@@ -4,7 +4,22 @@ This file provides guidance to AGENTS when working with code in this repository.
 
 ## Repository state
 
-This is a GitHub template for Bun-based DevOps projects (created with `bun init`, Bun v1.4.2). There is no entry point — `index.ts` was intentionally removed; bring your own code. The quality tooling is prewired: Biome and Prettier with strict ownership, ShellCheck, `tsc`, Husky hooks (activated by `bun install`), and the agent tooling described below. The `.husky/*.ts` hooks count as TypeScript inputs, so `bun run typecheck` passes even before any source file exists.
+This repository builds and publishes custom templates for Docker Sandboxes:
+ready-to-run, batteries-included environments for coding agents, built on the
+official `docker/sandbox-templates` base images. The publishing layout — a
+single image with one rolling tag per variant plus immutable dated tags — is
+recorded in `docs/adr/0001-variant-tags-mirror-upstream.md`.
+
+The only variant today is `claude-code-docker` (`src/Dockerfile`): a
+kitchen-sink environment for the Claude Code agent — Node.js 26, Bun, Nix
+(flakes), Rust, uv/ruff/ty — on top of the `claude-code-docker` base, which
+ships a full Docker Engine inside the sandbox.
+
+There is no application code. The repository is Dockerfiles plus prewired
+quality tooling: Biome and Prettier with strict ownership, ShellCheck, `tsc`,
+Husky hooks (activated by `bun install`), and the agent tooling described
+below. The `.husky/*.ts` hooks count as TypeScript inputs, so
+`bun run typecheck` passes.
 
 ## Commands
 
@@ -15,9 +30,17 @@ This is a GitHub template for Bun-based DevOps projects (created with `bun init`
 - `bun run lint:sh` — ShellCheck over the tracked shell scripts
 - `bun run format` / `bun run format:check` — Prettier write/check (markdown, YAML, shell, Dockerfile)
 - `bun run typecheck` — `tsc --noEmit`
-- `bun build <entry.ts|entry.html|entry.css>` — bundle
+- Build and publish the template image — see [Build and publish](README.md#build-and-publish) in the README for the exact multi-arch `docker buildx build` invocation (rolling + dated tags, `--push`)
 
-No linter or formatter is configured.
+## Building images
+
+Conventions for the template Dockerfiles:
+
+- Pin every tool version as an `ARG` at the top of the file; never rely on an implicit `latest`.
+- The sandbox base images default to the non-root `agent` user with passwordless sudo. System packages (apt, NodeSource) are installed through `sudo` from that user; `USER root` appears only in the assembly stage (`scratch-copies`), for the recursive `chown`. Tools that must live in the agent's home directory (bun, rustup, uv, nix) are staged under `/__SCRATCH__/home/agent` and copied in with `agent:agent` ownership — installed as root they would land under `/root/`, where the agent user cannot use them.
+- Extend the `-docker` base variants only when the sandbox needs in-sandbox container builds: they run privileged, with a block volume at `/var/lib/docker`.
+- The build context is `src/`; the Dockerfile has no `COPY` from the context — only URL `ADD`s and cross-stage copies.
+- Keep both architecture stages (`FROM scratch-${TARGETARCH}`) working: images are built for `linux/amd64` and `linux/arm64`.
 
 ## TypeScript strictness (tsconfig.json)
 
@@ -31,21 +54,10 @@ Default to using Bun instead of Node.js.
 
 - Use `bun <file>` instead of `node <file>` or `ts-node <file>`
 - Use `bun test` instead of `jest` or `vitest`
-- Use `bun build <file.html|file.ts|file.css>` instead of `webpack` or `esbuild`
 - Use `bun install` instead of `npm install` or `yarn install` or `pnpm install`
 - Use `bun run <script>` instead of `npm run <script>` or `yarn run <script>` or `pnpm run <script>`
 - Use `bunx <package> <command>` instead of `npx <package> <command>`
 - Bun automatically loads .env, so don't use dotenv.
-
-### APIs
-
-- `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
-- `bun:sqlite` for SQLite. Don't use `better-sqlite3`.
-- `Bun.redis` for Redis. Don't use `ioredis`.
-- `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
-- `WebSocket` is built-in. Don't use `ws`.
-- Prefer `Bun.file` over `node:fs`'s readFile/writeFile
-- Bun.$`ls` instead of execa.
 
 ### Testing
 
@@ -58,80 +70,6 @@ test("hello world", () => {
   expect(1).toBe(1);
 });
 ```
-
-### Frontend
-
-Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.
-
-Server:
-
-```ts#index.ts
-import index from "./index.html"
-
-Bun.serve({
-  routes: {
-    "/": index,
-    "/api/users/:id": {
-      GET: (req) => {
-        return new Response(JSON.stringify({ id: req.params.id }));
-      },
-    },
-  },
-  // optional websocket support
-  websocket: {
-    open: (ws) => {
-      ws.send("Hello, world!");
-    },
-    message: (ws, message) => {
-      ws.send(message);
-    },
-    close: (ws) => {
-      // handle close
-    }
-  },
-  development: {
-    hmr: true,
-    console: true,
-  }
-})
-```
-
-HTML files can import .tsx, .jsx or .js files directly and Bun's bundler will transpile & bundle automatically. `<link>` tags can point to stylesheets and Bun's CSS bundler will bundle.
-
-```html#index.html
-<html>
-  <body>
-    <h1>Hello, world!</h1>
-    <script type="module" src="./frontend.tsx"></script>
-  </body>
-</html>
-```
-
-With the following `frontend.tsx`:
-
-```tsx#frontend.tsx
-import React from "react";
-import { createRoot } from "react-dom/client";
-
-// import .css files directly and it works
-import './index.css';
-
-const root = createRoot(document.body);
-
-export default function Frontend() {
-  return <h1>Hello, world!</h1>;
-}
-
-root.render(<Frontend />);
-```
-
-Then, run index.ts
-
-```sh
-bun --hot ./index.ts
-```
-
-For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
 
 ## Agent skills
 
